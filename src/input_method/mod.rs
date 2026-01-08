@@ -10,9 +10,13 @@ use vietnamese_engine::VietnameseEngine;
 
 #[derive(Debug)]
 pub struct InputMethodEngine {
+    #[allow(dead_code)] // Will be used when input processing is implemented
     config: Arc<Mutex<Config>>,
+    #[allow(dead_code)] // Will be used when input processing is implemented
     vietnamese_engine: VietnameseEngine,
+    #[allow(dead_code)] // Will be used when input processing is implemented
     is_vietnamese_mode: bool,
+    #[allow(dead_code)] // Will be used when input processing is implemented
     current_buffer: String,
 }
 
@@ -26,6 +30,7 @@ impl InputMethodEngine {
         }
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub async fn process_keypress(&mut self, key_char: char) -> Option<String> {
         if !self.is_vietnamese_mode {
             // Pass through directly if not in Vietnamese mode
@@ -50,19 +55,23 @@ impl InputMethodEngine {
         }
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub fn toggle_vietnamese_mode(&mut self) {
         self.is_vietnamese_mode = !self.is_vietnamese_mode;
         self.reset_buffer();
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub fn reset_buffer(&mut self) {
         self.current_buffer.clear();
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub fn is_vietnamese_mode(&self) -> bool {
         self.is_vietnamese_mode
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub fn backspace(&mut self) -> Option<String> {
         if !self.current_buffer.is_empty() {
             self.current_buffer.pop();
@@ -77,6 +86,7 @@ impl InputMethodEngine {
         }
     }
 
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
     pub fn commit_current_text(&mut self) -> String {
         let result = self.current_buffer.clone();
         self.reset_buffer();

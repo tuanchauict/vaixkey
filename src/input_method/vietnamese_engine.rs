@@ -17,6 +17,7 @@ impl VietnameseEngine {
         engine
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn init_telex_mapping(&mut self) {
         // Vowels with tones
         self.telex_map.insert("a", "a");
@@ -40,6 +41,7 @@ impl VietnameseEngine {
         // We'll handle tones separately in the processing logic
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn init_vni_mapping(&mut self) {
         // VNI mappings (numbers for tones and special characters)
         self.vni_map.insert("a6", "ă");
@@ -51,6 +53,7 @@ impl VietnameseEngine {
         self.vni_map.insert("d9", "đ");
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     pub fn process_telex(&self, input: &str) -> Option<String> {
         if input.is_empty() {
             return None;
@@ -137,6 +140,7 @@ impl VietnameseEngine {
         Some(result)
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     pub fn process_vni(&self, input: &str) -> Option<String> {
         // Simple VNI implementation
         let mut result = input.to_string();
@@ -151,11 +155,13 @@ impl VietnameseEngine {
         Some(result)
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     pub fn process_simple_telex(&self, input: &str) -> Option<String> {
         // Simplified version of Telex without complex tone handling
         self.process_telex(input)
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn find_last_vowel_position(&self, text: &str) -> Option<usize> {
         let vowels = "aeiouâăêôơưyAEIOUÂĂÊÔƠƯY";
         text.char_indices()
@@ -164,6 +170,7 @@ impl VietnameseEngine {
             .map(|(pos, _)| pos)
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn apply_tone_to_position(&self, text: &str, pos: usize, tone: ToneMark) -> String {
         let mut chars: Vec<char> = text.chars().collect();
         if pos < chars.len() {
@@ -175,6 +182,7 @@ impl VietnameseEngine {
         chars.into_iter().collect()
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn apply_tone_to_char(&self, c: char, tone: ToneMark) -> Option<char> {
         match (c, tone) {
             // Acute tone (sắc)
@@ -251,6 +259,7 @@ impl VietnameseEngine {
         }
     }
 
+    #[allow(dead_code)] // Will be used when input processing is fully implemented
     fn apply_vni_tones(&self, text: &str) -> String {
         let mut result = text.to_string();
 
@@ -263,6 +272,7 @@ impl VietnameseEngine {
     }
 }
 
+#[allow(dead_code)] // Will be used when input processing is fully implemented
 #[derive(Debug, Clone, Copy)]
 enum ToneMark {
     Acute,  // sắc (/)

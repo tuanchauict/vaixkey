@@ -4,15 +4,18 @@
 use crate::config::Config;
 use log::info;
 
+#[allow(dead_code)] // Will be implemented when GUI is added
 pub struct GuiManager {
     // GUI state management
 }
 
 impl GuiManager {
+    #[allow(dead_code)] // Will be implemented when GUI is added
     pub fn new() -> Self {
         Self {}
     }
 
+    #[allow(dead_code)] // Will be implemented when GUI is added
     pub async fn show_settings(&self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Showing settings window");
 
@@ -26,6 +29,7 @@ impl GuiManager {
         Ok(())
     }
 
+    #[allow(dead_code)] // Will be implemented when GUI is added
     pub async fn show_status_indicator(&self, is_vietnamese: bool) -> Result<(), Box<dyn std::error::Error>> {
         info!("Updating status indicator: Vietnamese mode = {}", is_vietnamese);
 
@@ -35,6 +39,7 @@ impl GuiManager {
         Ok(())
     }
 
+    #[allow(dead_code)] // Will be implemented when GUI is added
     pub async fn update_config(&self, config: Config) -> Result<(), Box<dyn std::error::Error>> {
         info!("Updating configuration through GUI");
 
