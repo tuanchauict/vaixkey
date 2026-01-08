@@ -1,0 +1,31 @@
+[package]
+name = "vaixkey"
+version = "0.1.0"
+edition = "2021"
+description = "A Vietnamese input method for macOS"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+
+[dependencies]
+# Core event handling and keyboard monitoring
+rdev = "0.4"
+# macOS-specific APIs through Objective-C bindings
+objc = "0.2"
+cocoa = "0.25"
+core-foundation = "0.10"
+core-graphics = "0.23"
+# Unicode and string processing
+unicode-normalization = "0.1"
+# Configuration and serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+# Logging
+log = "0.4"
+env_logger = "0.11"
+# Async runtime for event handling
+tokio = { version = "1.0", features = ["full"] }
+
+[[bin]]
+name = "vaixkey"
+path = "src/main.rs"

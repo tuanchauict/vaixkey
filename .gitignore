@@ -1,0 +1,30 @@
+# Rust
+/target
+Cargo.lock
+
+# Reference code (not to be committed)
+x-unikey
+
+# macOS
+.DS_Store
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+build/
+
+# Tauri
+/src-tauri/target/
+/src-tauri/Cargo.lock
+
+# Logs
+*.log
+
+# Configuration (user-specific)
+config.toml
