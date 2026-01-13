@@ -500,6 +500,41 @@ impl UnikeyEngine {
                     continue;
                 }
 
+                // Special handling for "uo" → "ươ" diphthong
+                // If we're applying horn to 'o' and there's a 'u' before it, apply horn to both
+                let raw_base = self.get_raw_base_vowel(buf_char);
+                if raw_base == 'o' && i > 0 {
+                    let prev_char = self.buf[(i - 1) as usize];
+                    let prev_raw = self.get_raw_base_vowel(prev_char);
+                    if prev_raw == 'u' {
+                        // "uo" pattern - apply horn to both vowels
+                        let prev_attr = self.dt.get(&prev_char).copied().unwrap_or_default();
+                        
+                        // Transform 'u' to 'ư' preserving tone
+                        let u_target = if prev_char.is_uppercase() { 'Ư' } else { 'ư' };
+                        let new_u = if prev_attr.current_tone > 0 {
+                            self.apply_tone_to_base(u_target, prev_attr.current_tone)
+                        } else {
+                            u_target
+                        };
+                        
+                        // Transform 'o' to 'ơ' preserving tone
+                        let o_target = if buf_char.is_uppercase() { 'Ơ' } else { 'ơ' };
+                        let new_o = if attr.current_tone > 0 {
+                            self.apply_tone_to_base(o_target, attr.current_tone)
+                        } else {
+                            o_target
+                        };
+                        
+                        self.backs = (self.keys - (i - 1) as usize) as usize;
+                        self.buf[(i - 1) as usize] = new_u;
+                        self.buf[i as usize] = new_o;
+                        self.rebuild_output((i - 1) as usize);
+                        self.keys_pushed = self.output_buffer.len();
+                        return;
+                    }
+                }
+
                 // Get the base character of the target family to check for undo
                 let target_base = match target_char.to_lowercase().next().unwrap_or(target_char) {
                     'ă' => if buf_char.is_uppercase() { 'Ă' } else { 'ă' },
