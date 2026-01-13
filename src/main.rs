@@ -204,6 +204,25 @@ async fn run_test_mode(
         println!("   {} → {} ({})", input, result, description);
     }
 
+    // Test undo behavior (triple char: ooo → oo, aaa → aa)
+    println!("\n↩️  Double-Char Undo Tests (escape sequences):");
+    let undo_tests = vec![
+        ("ooo", "oo", "ooo → oo (undo ô)"),
+        ("aaa", "aa", "aaa → aa (undo â)"),
+        ("eee", "ee", "eee → ee (undo ê)"),
+        ("ddd", "dd", "ddd → dd (undo đ)"),
+    ];
+
+    for (input, expected, description) in &undo_tests {
+        engine.reset_buffer();
+        for ch in input.chars() {
+            engine.process_keypress(ch).await;
+        }
+        let result = engine.get_current_buffer().to_string();
+        let status = if result == *expected { "✅" } else { "❌" };
+        println!("   {} {} → {} (expected: {}) - {}", status, input, result, expected, description);
+    }
+
     println!("\n🎯 Tone Mark Processing:");
     let tone_tests = vec![
         ("as", "a + sắc tone"),
@@ -230,6 +249,7 @@ async fn run_test_mode(
         ("ddaays", "đấy"),
         ("hocj", "học"),
         ("tooij", "tội"),
+        ("xooong", "xoong"),  // Need 3 o's to get "oo" (undo circumflex)
     ];
 
     for (input, expected) in &word_tests {

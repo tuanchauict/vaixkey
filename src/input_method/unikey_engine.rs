@@ -554,6 +554,40 @@ impl UnikeyEngine {
         }
     }
 
+    /// Get the raw Latin base letter for a Vietnamese vowel (strips all diacritics)
+    /// â, ấ, ầ, ẩ, ẫ, ậ, ă, ắ, ằ, ẳ, ẵ, ặ, á, à, ả, ã, ạ → 'a'
+    /// ê, ế, ề, ể, ễ, ệ, é, è, ẻ, ẽ, ẹ → 'e'
+    /// ô, ố, ồ, ổ, ỗ, ộ, ơ, ớ, ờ, ở, ỡ, ợ, ó, ò, ỏ, õ, ọ → 'o'
+    /// í, ì, ỉ, ĩ, ị → 'i'
+    /// ư, ứ, ừ, ử, ữ, ự, ú, ù, ủ, ũ, ụ → 'u'
+    /// ý, ỳ, ỷ, ỹ, ỵ → 'y'
+    fn get_raw_base_vowel(&self, c: char) -> char {
+        let c_lower = c.to_lowercase().next().unwrap_or(c);
+        match c_lower {
+            'a' | 'á' | 'à' | 'ả' | 'ã' | 'ạ' |
+            'â' | 'ấ' | 'ầ' | 'ẩ' | 'ẫ' | 'ậ' |
+            'ă' | 'ắ' | 'ằ' | 'ẳ' | 'ẵ' | 'ặ' => 'a',
+            
+            'e' | 'é' | 'è' | 'ẻ' | 'ẽ' | 'ẹ' |
+            'ê' | 'ế' | 'ề' | 'ể' | 'ễ' | 'ệ' => 'e',
+            
+            'i' | 'í' | 'ì' | 'ỉ' | 'ĩ' | 'ị' => 'i',
+            
+            'o' | 'ó' | 'ò' | 'ỏ' | 'õ' | 'ọ' |
+            'ô' | 'ố' | 'ồ' | 'ổ' | 'ỗ' | 'ộ' |
+            'ơ' | 'ớ' | 'ờ' | 'ở' | 'ỡ' | 'ợ' => 'o',
+            
+            'u' | 'ú' | 'ù' | 'ủ' | 'ũ' | 'ụ' |
+            'ư' | 'ứ' | 'ừ' | 'ử' | 'ữ' | 'ự' => 'u',
+            
+            'y' | 'ý' | 'ỳ' | 'ỷ' | 'ỹ' | 'ỵ' => 'y',
+            
+            'd' | 'đ' => 'd',
+            
+            _ => c_lower,
+        }
+    }
+
     /// Process double character (aa, ee, oo, dd)
     fn double_char(&mut self, c: char, is_lower: bool) {
         if self.keys == 0 {
@@ -561,11 +595,13 @@ impl UnikeyEngine {
         }
 
         let last_char = self.buf[self.keys - 1];
-        let last_lower = last_char.to_lowercase().next().unwrap_or(last_char);
         let c_lower = c.to_lowercase().next().unwrap_or(c);
+        
+        // Get the raw base letter (strips all diacritics: ô → o, â → a)
+        let last_raw_base = self.get_raw_base_vowel(last_char);
 
-        // Check if this is a valid double character
-        if last_lower != c_lower {
+        // Check if this is a valid double character combination
+        if last_raw_base != c_lower {
             return;
         }
 
@@ -577,30 +613,26 @@ impl UnikeyEngine {
             _ => return,
         };
 
-        // Check for undo (triple char)
-        let last_attr = self.dt.get(&last_char).copied().unwrap_or_default();
-        if last_attr.vowel_index > 0 {
-            let base = self.get_base_vowel(last_char);
-            if base.to_lowercase().next().unwrap_or(base) != c_lower {
-                // Already transformed, undo
-                self.backs = 1;
-                let original = if is_lower { c_lower } else { c_lower.to_uppercase().next().unwrap_or(c) };
-                self.buf[self.keys - 1] = original;
-                self.output_buffer.push(original);
-                self.output_buffer.push(c);
-                self.put_char(c, is_lower);
-                self.temp_viet_off = true;
-                self.keys_pushed = 2;
-                return;
-            }
-        }
+        // Check if the last char is already transformed (undo case: ooo → oo)
+        let last_lower = last_char.to_lowercase().next().unwrap_or(last_char);
+        
+        // Check if last char has circumflex (â, ê, ô) or is đ
+        let is_already_transformed = match last_lower {
+            'â' | 'ấ' | 'ầ' | 'ẩ' | 'ẫ' | 'ậ' => c_lower == 'a',
+            'ê' | 'ế' | 'ề' | 'ể' | 'ễ' | 'ệ' => c_lower == 'e',
+            'ô' | 'ố' | 'ồ' | 'ổ' | 'ỗ' | 'ộ' => c_lower == 'o',
+            'đ' => c_lower == 'd',
+            _ => false,
+        };
 
-        // Check if the last char is already the target (undo case)
-        let last_base = self.get_base_vowel(last_char);
-        if last_base.to_lowercase().next() == target.to_lowercase().next() {
-            // Already transformed, undo by outputting original + new char
+        if is_already_transformed {
+            // Undo: replace transformed char with original + add the new char
             self.backs = 1;
-            let original = if self.lower_case[self.keys - 1] { c_lower } else { c_lower.to_uppercase().next().unwrap_or(c) };
+            let original = if self.lower_case[self.keys - 1] { 
+                c_lower 
+            } else { 
+                c_lower.to_uppercase().next().unwrap_or(c) 
+            };
             self.buf[self.keys - 1] = original;
             self.output_buffer.push(original);
             self.output_buffer.push(c);
@@ -610,7 +642,7 @@ impl UnikeyEngine {
             return;
         }
 
-        // Apply transformation
+        // Apply transformation (first double: oo → ô)
         let last_attr = self.dt.get(&last_char).copied().unwrap_or_default();
         let new_char = if last_attr.current_tone > 0 {
             self.apply_tone_to_base(target, last_attr.current_tone)
