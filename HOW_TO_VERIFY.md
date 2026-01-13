@@ -4,7 +4,31 @@ VaixKey is currently in **simulation mode** - the Vietnamese input processing en
 
 ## 🔍 Quick Verification Commands
 
-### 1. **Check Overall Status**
+### 1. **Check macOS Security Permissions**
+```bash
+cargo run -- --permissions
+```
+**What you should see if permissions are granted:**
+```
+🔐 VaixKey Permission Status
+============================
+🔍 Input Monitoring: ✅ Granted
+🔧 Accessibility: ✅ Granted
+
+🎯 VaixKey is ready for keyboard capture!
+```
+
+**What you'll see if permissions are missing:**
+```
+🔐 VaixKey Permission Status
+============================
+🔍 Input Monitoring: ❌ DENIED - Required for keystroke capture
+🔧 Accessibility: ❌ DENIED - Required for text injection
+
+⚠️  VaixKey cannot function without these permissions
+```
+
+### 2. **Check Overall Status**
 ```bash
 cargo run -- --status
 ```
@@ -29,7 +53,26 @@ cargo run -- --status
 ✅ VaixKey is properly configured and ready!
 ```
 
-### 2. **Test Vietnamese Input Processing**
+### 2. **Setup Security Permissions (Required for Real Keyboard Capture)**
+```bash
+cargo run -- --setup-permissions
+```
+**Shows step-by-step instructions for:**
+- Granting Input Monitoring permission
+- Granting Accessibility permission
+- Verifying permissions are working
+
+### 3. **Detailed Security Status**
+```bash
+cargo run -- --security-status
+```
+**Shows comprehensive information:**
+- macOS version information
+- Current permission status
+- Application details (process ID, path)
+- Required actions if permissions missing
+
+### 4. **Test Vietnamese Input Processing**
 ```bash
 cargo run -- --test
 ```
@@ -56,7 +99,7 @@ cargo run -- --test
 ✅ Test complete! VaixKey engine is working properly.
 ```
 
-### 3. **Open Settings Interface**
+### 5. **Open Settings Interface**
 ```bash
 cargo run -- --settings
 ```
@@ -172,13 +215,15 @@ switch_input_method = "Ctrl+Alt+V"
 4. ✅ Opens settings interface with `--settings` command
 5. ✅ Displays native macOS notifications
 6. ✅ Loads and saves configuration properly
+7. ✅ Shows security permission status with `--permissions` command
 
 **Future Definition of "Working" (when keyboard capture is implemented):**
 1. ✅ All of the above, plus:
-2. ⏳ Captures actual keyboard input in any application
-3. ⏳ Converts Telex input to Vietnamese in real-time
-4. ⏳ Shows menu bar icon with quick toggle
-5. ⏳ Responds to configured hotkeys
+2. ✅ Shows `✅ Granted` for both Input Monitoring and Accessibility permissions
+3. ⏳ Captures actual keyboard input in any application
+4. ⏳ Converts Telex input to Vietnamese in real-time
+5. ⏳ Shows menu bar icon with quick toggle
+6. ⏳ Responds to configured hotkeys
 
 ## 🚀 Next Implementation Steps
 
