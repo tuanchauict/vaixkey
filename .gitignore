@@ -5,6 +5,7 @@ Cargo.lock
 # Reference code (not to be committed)
 x-unikey
 goxkey-main
+Uk362
 
 # macOS
 .DS_Store

@@ -12,7 +12,8 @@
       "Bash(timeout:*)",
       "Bash(cargo build:*)",
       "Bash(open:*)",
-      "Bash(osascript:*)"
+      "Bash(osascript:*)",
+      "Bash(cargo run:*)"
     ],
     "deny": [],
     "ask": []
