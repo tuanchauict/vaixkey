@@ -13,7 +13,9 @@
       "Bash(cargo build:*)",
       "Bash(open:*)",
       "Bash(osascript:*)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(RUST_LOG=debug cargo run:*)",
+      "Bash(export PATH:*)"
     ],
     "deny": [],
     "ask": []

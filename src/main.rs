@@ -35,7 +35,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Start keyboard monitor
-    let keyboard_monitor = KeyboardMonitor::new(engine.clone());
+    let keyboard_monitor = if std::env::var("VAIXKEY_DEBUG").is_ok() {
+        KeyboardMonitor::new_with_debug(engine.clone())
+    } else {
+        KeyboardMonitor::new(engine.clone())
+    };
 
     // Start the application
     info!("VaixKey is now running. Press Ctrl+C to exit or run with --settings to open settings.");
@@ -53,8 +57,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--status" => {
                 return show_status(config.clone(), engine.clone()).await;
             }
+            "--debug" => {
+                info!("🔍 Starting VaixKey in DEBUG mode with comprehensive keystroke logging");
+                return run_debug_mode(engine.clone()).await;
+            }
             _ => {
-                println!("Usage: vaixkey [--settings|--test|--status]");
+                println!("Usage: vaixkey [--settings|--test|--status|--debug]");
+                println!("");
+                println!("Commands:");
+                println!("  --settings  Open settings interface");
+                println!("  --test      Test Vietnamese processing engine");
+                println!("  --status    Show configuration and engine status");
+                println!("  --debug     Run with comprehensive keystroke logging");
+                println!("");
+                println!("Environment Variables:");
+                println!("  VAIXKEY_DEBUG=1  Enable debug logging in normal mode");
                 return Ok(());
             }
         }
@@ -176,6 +193,34 @@ async fn run_test_mode(
     println!("\n✅ Test complete! VaixKey engine is working properly.");
     println!("   Note: This tests the processing engine only.");
     println!("   Keyboard capture is not yet implemented.");
+
+    Ok(())
+}
+
+async fn run_debug_mode(
+    engine: Arc<Mutex<InputMethodEngine>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔍 VaixKey Debug Mode");
+    println!("====================");
+    println!("📝 Comprehensive keystroke capture and processing logging");
+    println!("");
+    println!("🎯 What you'll see:");
+    println!("   🔴 KEY PRESS events with timestamps");
+    println!("   🔵 KEY RELEASE events");
+    println!("   📊 Engine state (Vietnamese mode, buffer contents)");
+    println!("   🔤 Character processing details");
+    println!("   ✨ Vietnamese transformation results");
+    println!("   📋 Complete keystroke information");
+    println!("");
+    println!("⌨️  Start typing to see real-time keystroke capture...");
+    println!("   (Press Ctrl+C to exit)");
+    println!("");
+
+    // Create keyboard monitor in debug mode
+    let keyboard_monitor = KeyboardMonitor::new_with_debug(engine.clone());
+
+    // Start monitoring
+    keyboard_monitor.start().await?;
 
     Ok(())
 }

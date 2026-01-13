@@ -92,4 +92,9 @@ impl InputMethodEngine {
         self.reset_buffer();
         result
     }
+
+    #[allow(dead_code)] // Will be used when keyboard monitoring is implemented
+    pub fn get_current_buffer(&self) -> &str {
+        &self.current_buffer
+    }
 }
