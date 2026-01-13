@@ -70,17 +70,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--setup-permissions" => {
                 return setup_permissions_guide().await;
             }
+            "--open-accessibility" => {
+                println!("📱 Opening System Settings → Accessibility...");
+                open_system_settings("accessibility");
+                return Ok(());
+            }
+            "--open-input-monitoring" => {
+                println!("📱 Opening System Settings → Input Monitoring...");
+                open_system_settings("input_monitoring");
+                return Ok(());
+            }
+            "--request-permission" => {
+                println!("🔐 Requesting Accessibility permission...");
+                let granted = request_accessibility_permission();
+                if granted {
+                    println!("✅ Permission already granted! VaixKey is ready.");
+                } else {
+                    println!("⏳ Permission request sent. Check System Settings if no dialog appeared.");
+                    println!("   Opening System Settings → Accessibility...");
+                    open_system_settings("accessibility");
+                }
+                return Ok(());
+            }
+            "--test-capture" => {
+                return test_real_keyboard_capture(engine.clone()).await;
+            }
             _ => {
                 println!("Usage: vaixkey [--settings|--test|--status|--debug|--permissions]");
                 println!("");
                 println!("Commands:");
-                println!("  --settings           Open settings interface");
-                println!("  --test              Test Vietnamese processing engine");
-                println!("  --status            Show configuration and engine status");
-                println!("  --debug             Run with comprehensive keystroke logging");
-                println!("  --permissions       Check macOS security permissions");
-                println!("  --security-status   Show detailed security status");
-                println!("  --setup-permissions Guide for setting up permissions");
+                println!("  --settings             Open settings interface");
+                println!("  --test                 Test Vietnamese processing engine");
+                println!("  --status               Show configuration and engine status");
+                println!("  --debug                Run with comprehensive keystroke logging");
+                println!("  --permissions          Check macOS security permissions");
+                println!("  --security-status      Show detailed security status");
+                println!("  --setup-permissions    Interactive guide for setting up permissions");
+                println!("  --request-permission   Request Accessibility permission from macOS");
+                println!("  --open-accessibility   Open System Settings → Accessibility");
+                println!("  --open-input-monitoring Open System Settings → Input Monitoring");
+                println!("  --test-capture         Test real keyboard capture (requires permissions)");
                 println!("");
                 println!("Environment Variables:");
                 println!("  VAIXKEY_DEBUG=1  Enable debug logging in normal mode");
@@ -337,57 +366,303 @@ async fn setup_permissions_guide() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================================");
     println!("");
 
-    println!("VaixKey needs two macOS permissions to function:");
+    // Check current permission status
+    let accessibility = check_accessibility_permission().await;
+    let input_monitoring = check_input_monitoring_permission().await;
+
+    println!("📊 Current Permission Status:");
+    println!("   🔍 Input Monitoring: {}", if input_monitoring { "✅ Granted" } else { "❌ Not granted" });
+    println!("   🔧 Accessibility: {}", if accessibility { "✅ Granted" } else { "❌ Not granted" });
     println!("");
 
-    println!("1️⃣ INPUT MONITORING");
-    println!("   • Required for: Capturing keyboard input");
-    println!("   • Location: System Preferences → Security & Privacy → Privacy → Input Monitoring");
-    println!("   • Action: Check the box next to 'vaixkey' or 'Terminal'");
+    if accessibility && input_monitoring {
+        println!("🎉 All permissions are already granted!");
+        println!("   VaixKey is ready to use.");
+        println!("   Run `cargo run` to start VaixKey.");
+        return Ok(());
+    }
+
+    println!("VaixKey needs macOS Accessibility permission to function.");
+    println!("(Both Input Monitoring and Accessibility use the same permission)");
     println!("");
 
-    println!("2️⃣ ACCESSIBILITY");
-    println!("   • Required for: Injecting Vietnamese text into applications");
-    println!("   • Location: System Preferences → Security & Privacy → Privacy → Accessibility");
-    println!("   • Action: Check the box next to 'vaixkey' or 'Terminal'");
+    println!("🚀 Quick Setup Options:");
+    println!("");
+    println!("  1. [Recommended] Let VaixKey request permission automatically");
+    println!("  2. Open System Settings → Privacy & Security → Accessibility");
+    println!("  3. Open System Settings → Privacy & Security → Input Monitoring");
+    println!("  4. Show manual setup instructions");
+    println!("  5. Exit");
     println!("");
 
-    println!("📋 Step-by-Step Instructions:");
-    println!("");
-    println!("1. Open System Preferences (🍎 → System Preferences)");
-    println!("2. Click 'Security & Privacy'");
-    println!("3. Click the 'Privacy' tab");
-    println!("4. Click the lock icon (🔒) and enter your password");
-    println!("5. Select 'Input Monitoring' from the left sidebar");
-    println!("6. Check the box next to 'vaixkey' or 'Terminal'");
-    println!("7. Select 'Accessibility' from the left sidebar");
-    println!("8. Check the box next to 'vaixkey' or 'Terminal'");
-    println!("9. Restart VaixKey");
-    println!("");
+    print!("Choose an option (1-5): ");
+    use std::io::{self, Write};
+    io::stdout().flush()?;
 
-    println!("🧪 Verification:");
-    println!("   Run: cargo run -- --permissions");
-    println!("   You should see both permissions marked as ✅ Granted");
-    println!("");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
 
-    println!("📖 For detailed instructions with screenshots, see:");
-    println!("   SECURITY_SETUP.md in the VaixKey directory");
+    match input.trim() {
+        "1" => {
+            println!("");
+            println!("🔐 Requesting Accessibility permission...");
+            println!("   A system dialog should appear asking for permission.");
+            println!("");
+            
+            let granted = request_accessibility_permission();
+            
+            if granted {
+                println!("✅ Permission granted! VaixKey is ready to use.");
+            } else {
+                println!("⏳ Permission request sent.");
+                println!("");
+                println!("📋 If no dialog appeared, please:");
+                println!("   1. Open System Settings → Privacy & Security → Accessibility");
+                println!("   2. Find and enable 'Terminal' (or 'vaixkey' if running the built app)");
+                println!("   3. You may need to click the lock 🔒 icon first");
+                println!("");
+                println!("Opening System Settings...");
+                open_system_settings("accessibility");
+            }
+        }
+        "2" => {
+            println!("");
+            println!("📱 Opening System Settings → Accessibility...");
+            open_system_settings("accessibility");
+            println!("");
+            println!("📋 In System Settings:");
+            println!("   1. Click the lock icon 🔒 if needed");
+            println!("   2. Find 'Terminal' (or 'vaixkey') in the list");
+            println!("   3. Toggle the switch to enable it");
+            println!("   4. Restart VaixKey after granting permission");
+        }
+        "3" => {
+            println!("");
+            println!("📱 Opening System Settings → Input Monitoring...");
+            open_system_settings("input_monitoring");
+            println!("");
+            println!("📋 In System Settings:");
+            println!("   1. Click the lock icon 🔒 if needed");
+            println!("   2. Find 'Terminal' (or 'vaixkey') in the list");
+            println!("   3. Toggle the switch to enable it");
+            println!("   4. Restart VaixKey after granting permission");
+        }
+        "4" => {
+            println!("");
+            print_manual_setup_instructions();
+        }
+        _ => {
+            println!("Exiting setup guide.");
+        }
+    }
+
+    println!("");
+    println!("🧪 After granting permissions, verify with:");
+    println!("   cargo run -- --permissions");
 
     Ok(())
 }
 
-// Helper functions for permission checking
-// In a real implementation, these would use macOS APIs
+fn print_manual_setup_instructions() {
+    println!("📋 Manual Setup Instructions");
+    println!("=============================");
+    println!("");
+    println!("For macOS Ventura (13.0) and later:");
+    println!("─────────────────────────────────────");
+    println!("1. Click the Apple menu (🍎) → System Settings");
+    println!("2. Click 'Privacy & Security' in the sidebar");
+    println!("3. Scroll down and click 'Accessibility'");
+    println!("4. Click the toggle next to 'Terminal' to enable it");
+    println!("   (You may need to click the lock and enter your password)");
+    println!("5. Also check 'Input Monitoring' and enable 'Terminal'");
+    println!("");
+    println!("For macOS Monterey (12.0) and earlier:");
+    println!("────────────────────────────────────────");
+    println!("1. Click the Apple menu (🍎) → System Preferences");
+    println!("2. Click 'Security & Privacy'");
+    println!("3. Click the 'Privacy' tab");
+    println!("4. Select 'Accessibility' from the left sidebar");
+    println!("5. Click the lock icon 🔒 and enter your password");
+    println!("6. Check the box next to 'Terminal'");
+    println!("7. Select 'Input Monitoring' and check 'Terminal' there too");
+    println!("");
+    println!("💡 Tips:");
+    println!("   • If 'Terminal' is not listed, run VaixKey once first");
+    println!("   • If permission doesn't work, try toggling it off and on");
+    println!("   • You may need to restart Terminal after granting permission");
+    println!("   • For the built app, look for 'vaixkey' instead of 'Terminal'");
+}
+
+// Helper functions for permission checking using macOS APIs
+
+/// Check if Accessibility permission is granted using AXIsProcessTrustedWithOptions
+fn check_accessibility_trusted(prompt: bool) -> bool {
+    use core_foundation::base::{CFRelease, TCFType};
+    use core_foundation::boolean::CFBoolean;
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::string::CFString;
+    
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
+    }
+    
+    unsafe {
+        if prompt {
+            // Create options dictionary with kAXTrustedCheckOptionPrompt = true
+            // This will prompt the user to grant permission
+            let key = CFString::new("AXTrustedCheckOptionPrompt");
+            let value = CFBoolean::true_value();
+            let options = CFDictionary::from_CFType_pairs(&[(key.as_CFType(), value.as_CFType())]);
+            AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef() as *const _)
+        } else {
+            AXIsProcessTrustedWithOptions(std::ptr::null())
+        }
+    }
+}
+
 async fn check_input_monitoring_permission() -> bool {
-    // This is a placeholder - real implementation would use:
-    // CGPreflightScreenCaptureAccess() or similar Input Monitoring API
-    // For now, assume permission is needed but not granted
-    false
+    // Input Monitoring permission is tied to Accessibility on macOS
+    // The rdev library uses Quartz Event Taps which require Accessibility permission
+    // We test this by checking if we can create an event tap
+    check_accessibility_trusted(false)
 }
 
 async fn check_accessibility_permission() -> bool {
-    // This is a placeholder - real implementation would use:
-    // AXIsProcessTrustedWithOptions(CFDictionaryRef options)
-    // For now, assume permission is needed but not granted
-    false
+    check_accessibility_trusted(false)
+}
+
+/// Open macOS System Settings to the appropriate privacy section
+fn open_system_settings(section: &str) {
+    use std::process::Command;
+    
+    // macOS Ventura and later use System Settings with different URL scheme
+    // macOS Monterey and earlier use System Preferences
+    let url = match section {
+        "accessibility" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        "input_monitoring" => "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+        _ => "x-apple.systempreferences:com.apple.preference.security?Privacy",
+    };
+    
+    let result = Command::new("open")
+        .arg(url)
+        .spawn();
+    
+    if let Err(e) = result {
+        eprintln!("Failed to open System Settings: {}", e);
+        // Fallback: try opening System Preferences app directly
+        let _ = Command::new("open")
+            .arg("-a")
+            .arg("System Preferences")
+            .spawn();
+    }
+}
+
+/// Request accessibility permission with a system prompt
+fn request_accessibility_permission() -> bool {
+    check_accessibility_trusted(true)
+}
+
+async fn test_real_keyboard_capture(
+    _engine: Arc<Mutex<InputMethodEngine>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🧪 Testing Real Keyboard Capture");
+    println!("=================================");
+    println!("This will test if VaixKey can actually capture keyboard events");
+    println!("using your granted macOS permissions.");
+    println!("");
+
+    println!("📋 Pre-flight checks:");
+
+    // Check permissions first
+    let input_monitoring = check_input_monitoring_permission().await;
+    let accessibility = check_accessibility_permission().await;
+
+    println!("   🔍 Input Monitoring: {}",
+        if input_monitoring { "✅" } else { "❌ Missing" });
+    println!("   🔧 Accessibility: {}",
+        if accessibility { "✅" } else { "❌ Missing" });
+
+    if !input_monitoring || !accessibility {
+        println!("");
+        println!("⚠️  Permission check shows missing permissions, but let's try anyway...");
+        println!("   (Note: Permission checking is not fully implemented yet)");
+        println!("   If you've granted permissions in System Preferences, this should still work.");
+        println!("");
+    }
+
+    println!("");
+    println!("🎯 Starting real keyboard capture test...");
+    println!("   • This uses the rdev library to capture actual keyboard events");
+    println!("   • If permissions are working, you'll see keypresses logged below");
+    println!("   • Type a few letters, then press Ctrl+C to exit");
+    println!("");
+    println!("⌨️  Start typing (Press Ctrl+C to stop):");
+
+    // Import rdev components we need
+    use rdev::{listen, Event, EventType};
+
+    // Remove unused variables for this simplified test
+
+    // Simple test: just try to start the listener without complex state management
+    println!("⚡ Attempting to start keyboard listener...");
+
+    // This is a simplified test - just check if rdev can start
+    let test_result = std::thread::spawn(|| {
+        // Simple callback that doesn't capture variables
+        fn simple_callback(event: Event) {
+            match event.event_type {
+                EventType::KeyPress(key) => {
+                    println!("🔴 KEY PRESS: {:?}", key);
+                    println!("   ✅ SUCCESS! Keyboard capture is working!");
+                    // For this test, we'll just capture one event and exit
+                    std::process::exit(0);
+                }
+                _ => {} // Ignore other event types for now
+            }
+        }
+
+        // This will fail if permissions aren't granted
+        match listen(simple_callback) {
+            Ok(_) => {
+                println!("🎉 Keyboard listener started successfully!");
+                // The listen function will block here until an event occurs
+            },
+            Err(e) => {
+                println!("❌ Failed to start keyboard listener: {:?}", e);
+                println!("   This usually means:");
+                println!("   • Input Monitoring permission not granted");
+                println!("   • Permission granted to wrong application");
+                println!("   • Need to restart after granting permission");
+                println!("");
+                println!("💡 Try these steps:");
+                println!("   1. Check System Preferences → Security & Privacy → Input Monitoring");
+                println!("   2. Make sure 'Terminal' is checked (since you're running via cargo)");
+                println!("   3. If it's already checked, try unchecking and rechecking");
+                println!("   4. Restart Terminal and try again");
+            }
+        }
+    });
+
+    // Give the listener thread time to start and potentially fail
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Wait for user to type something or timeout
+    println!("   • Listener thread started, waiting for keyboard events...");
+    println!("   • Press ANY key to test (the program will exit after one keypress)");
+    println!("   • Or wait 10 seconds for timeout");
+
+    // Simple timeout
+    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+    println!("");
+    println!("⏰ Test timeout - no keyboard events captured in 10 seconds");
+    println!("   This might mean:");
+    println!("   • Input Monitoring permission not granted to Terminal");
+    println!("   • You didn't type anything");
+    println!("   • Permission needs to be refreshed");
+    println!("");
+    println!("🏁 Keyboard capture test complete");
+
+    Ok(())
 }

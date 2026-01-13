@@ -1,10 +1,9 @@
 use crate::input_method::InputMethodEngine;
-use log::{info, debug, warn};
+use log::{info, debug, error};
 use rdev::{listen, Event, EventType, Key};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::sync::{Arc as StdArc, Mutex as StdMutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 
 pub struct KeyboardMonitor {
     engine: Arc<Mutex<InputMethodEngine>>,
@@ -19,6 +18,20 @@ pub struct KeystrokeInfo {
     pub current_buffer: String,
     pub processing_result: Option<String>,
     pub vietnamese_mode: bool,
+}
+
+// Global channel for sending events from the rdev callback
+use std::sync::OnceLock;
+static EVENT_SENDER: OnceLock<std::sync::Mutex<Option<mpsc::Sender<Event>>>> = OnceLock::new();
+
+fn global_callback(event: Event) {
+    if let Some(sender_mutex) = EVENT_SENDER.get() {
+        if let Ok(guard) = sender_mutex.lock() {
+            if let Some(sender) = guard.as_ref() {
+                let _ = sender.send(event);
+            }
+        }
+    }
 }
 
 impl KeyboardMonitor {
@@ -38,90 +51,152 @@ impl KeyboardMonitor {
 
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         if self.debug_mode {
-            info!("🔍 Starting keyboard monitor with DEBUG logging enabled");
-            info!("📝 Debug logs include: key events, buffer state, processing results");
+            println!("🔍 Starting keyboard monitor with DEBUG logging enabled");
+            println!("📝 Debug logs include: key events, buffer state, processing results");
         } else {
             info!("Starting keyboard monitor (set VAIXKEY_DEBUG=1 for detailed logging)");
         }
 
-        // For demonstration purposes, let's create a simple keyboard event simulator
-        // Real rdev integration would require more complex state management
-        info!("🎯 Keyboard capture starting (demo mode with real event structure)");
-        info!("💡 This demonstrates the logging structure - real keyboard capture needs permission setup");
+        println!("🎯 Real keyboard capture starting...");
+        println!("⌨️  Type something to see keystroke capture in action!");
+        println!("   Press Ctrl+C to exit\n");
 
-        // Show what the debug output would look like
-        if self.debug_mode {
-            self.demonstrate_keystroke_logging().await?;
-        }
+        // Create channel for receiving events
+        let (tx, rx) = mpsc::channel::<Event>();
+        
+        // Store sender in global state
+        EVENT_SENDER.get_or_init(|| std::sync::Mutex::new(Some(tx)));
+        
+        // Start the rdev listener in a separate thread
+        std::thread::spawn(move || {
+            if let Err(e) = listen(global_callback) {
+                eprintln!("❌ Failed to start keyboard listener: {:?}", e);
+                eprintln!("");
+                eprintln!("This usually means:");
+                eprintln!("   • Accessibility permission not granted to Terminal");
+                eprintln!("   • Need to restart Terminal after granting permission");
+                eprintln!("");
+                eprintln!("💡 Try: cargo run -- --open-accessibility");
+            }
+        });
 
-        // Keep running (in a real implementation, this would be the rdev listener)
+        // Process events in the main async context
+        let debug_mode = self.debug_mode;
+        let engine = self.engine.clone();
+        
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
-    }
-
-    async fn demonstrate_keystroke_logging(&self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("🧪 Demonstrating keystroke logging format...");
-
-        // Simulate some keystrokes to show the logging format
-        let demo_keys = vec!['h', 'e', 'l', 'l', 'o', ' ', 'a', 'a'];
-
-        for (i, key_char) in demo_keys.iter().enumerate() {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            let timestamp = std::time::Instant::now();
-            debug!("🔴 KEY PRESS: Key{} at {:?}", key_char.to_uppercase(), timestamp);
-
-            let (vietnamese_mode, current_buffer) = {
-                let engine = self.engine.lock().await;
-                (engine.is_vietnamese_mode(), engine.get_current_buffer().to_string())
-            };
-
-            debug!("📊 ENGINE STATE:");
-            debug!("   Vietnamese Mode: {}", vietnamese_mode);
-            debug!("   Current Buffer: '{}'", current_buffer);
-
-            if *key_char != ' ' {
-                let mut engine = self.engine.lock().await;
-                if let Some(result) = engine.process_keypress(*key_char).await {
-                    debug!("🔤 Processing character: '{}'", key_char);
-                    debug!("✨ Processing result: '{}' → '{}'", key_char, result);
-
-                    if result != key_char.to_string() {
-                        debug!("🔧 Vietnamese transformation applied");
-                    }
-
-                    let keystroke_info = KeystrokeInfo {
-                        key: format!("Key{}", key_char.to_uppercase()),
-                        event_type: "KeyPress".to_string(),
-                        timestamp,
-                        current_buffer: result.clone(),
-                        processing_result: Some(result),
-                        vietnamese_mode,
-                    };
-
-                    debug!("📋 KEYSTROKE INFO: {:#?}", keystroke_info);
+            // Check for events with a timeout to allow for graceful shutdown
+            match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                Ok(event) => {
+                    self.handle_event(event, debug_mode, &engine).await;
                 }
-            } else {
-                let mut engine = self.engine.lock().await;
-                let committed = engine.commit_current_text();
-                if !committed.is_empty() {
-                    debug!("⏎ COMMIT key pressed: Space");
-                    debug!("📤 Committed text: '{}'", committed);
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // No event, continue waiting
+                    continue;
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    error!("Event channel disconnected");
+                    break;
                 }
             }
-
-            debug!("─────────────────────────────────────");
-
-            if i == 3 {
-                info!("🔄 Demonstrating 'aa' → 'â' transformation...");
-            }
         }
-
-        info!("✅ Keystroke logging demonstration complete!");
-        info!("🎯 In real implementation, this would capture actual keyboard events");
 
         Ok(())
     }
 
+    async fn handle_event(&self, event: Event, debug_mode: bool, engine: &Arc<Mutex<InputMethodEngine>>) {
+        match event.event_type {
+            EventType::KeyPress(key) => {
+                let key_char = key_to_char(&key);
+                let key_name = format!("{:?}", key);
+                
+                if debug_mode {
+                    println!("🔴 KEY PRESS: {} ({})", 
+                        key_name, 
+                        key_char.map(|c| c.to_string()).unwrap_or_else(|| "special".to_string())
+                    );
+                }
+                
+                // Process the key if it's a character
+                if let Some(ch) = key_char {
+                    let mut eng = engine.lock().await;
+                    let vietnamese_mode = eng.is_vietnamese_mode();
+                    let buffer_before = eng.get_current_buffer().to_string();
+                    
+                    if debug_mode {
+                        println!("📊 ENGINE STATE:");
+                        println!("   Vietnamese Mode: {}", vietnamese_mode);
+                        println!("   Buffer before: '{}'", buffer_before);
+                    }
+                    
+                    if let Some(result) = eng.process_keypress(ch).await {
+                        if debug_mode {
+                            println!("🔤 Processing: '{}' → '{}'", ch, result);
+                            if result != ch.to_string() {
+                                println!("✨ Vietnamese transformation applied!");
+                            }
+                            println!("─────────────────────────────────────");
+                        }
+                    }
+                } else if matches!(key, Key::Space | Key::Return) {
+                    // Commit on space or enter
+                    let mut eng = engine.lock().await;
+                    let committed = eng.commit_current_text();
+                    if debug_mode && !committed.is_empty() {
+                        println!("📤 Committed: '{}'", committed);
+                        println!("─────────────────────────────────────");
+                    }
+                }
+            }
+            EventType::KeyRelease(key) => {
+                if debug_mode {
+                    debug!("🔵 KEY RELEASE: {:?}", key);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Convert rdev Key to a character
+fn key_to_char(key: &Key) -> Option<char> {
+    match key {
+        Key::KeyA => Some('a'),
+        Key::KeyB => Some('b'),
+        Key::KeyC => Some('c'),
+        Key::KeyD => Some('d'),
+        Key::KeyE => Some('e'),
+        Key::KeyF => Some('f'),
+        Key::KeyG => Some('g'),
+        Key::KeyH => Some('h'),
+        Key::KeyI => Some('i'),
+        Key::KeyJ => Some('j'),
+        Key::KeyK => Some('k'),
+        Key::KeyL => Some('l'),
+        Key::KeyM => Some('m'),
+        Key::KeyN => Some('n'),
+        Key::KeyO => Some('o'),
+        Key::KeyP => Some('p'),
+        Key::KeyQ => Some('q'),
+        Key::KeyR => Some('r'),
+        Key::KeyS => Some('s'),
+        Key::KeyT => Some('t'),
+        Key::KeyU => Some('u'),
+        Key::KeyV => Some('v'),
+        Key::KeyW => Some('w'),
+        Key::KeyX => Some('x'),
+        Key::KeyY => Some('y'),
+        Key::KeyZ => Some('z'),
+        Key::Num0 => Some('0'),
+        Key::Num1 => Some('1'),
+        Key::Num2 => Some('2'),
+        Key::Num3 => Some('3'),
+        Key::Num4 => Some('4'),
+        Key::Num5 => Some('5'),
+        Key::Num6 => Some('6'),
+        Key::Num7 => Some('7'),
+        Key::Num8 => Some('8'),
+        Key::Num9 => Some('9'),
+        _ => None,
+    }
 }

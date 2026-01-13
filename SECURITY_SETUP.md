@@ -142,7 +142,7 @@ cargo run -- --debug
 
 ## 🔍 **Permission Verification Commands**
 
-VaixKey includes built-in commands to check permission status:
+VaixKey includes built-in commands to check and manage permissions:
 
 ### **Quick Permission Check**
 ```bash
@@ -154,11 +154,33 @@ cargo run -- --permissions
 cargo run -- --security-status
 ```
 
-### **Permission Setup Helper**
+### **Interactive Permission Setup (Recommended)**
 ```bash
 cargo run -- --setup-permissions
 ```
-*This command guides you through the permission setup process*
+*This command provides an interactive guide with options to automatically open System Settings.*
+
+### **Request Permission Directly**
+```bash
+cargo run -- --request-permission
+```
+*This triggers the macOS permission dialog and opens System Settings if needed.*
+
+### **Open System Settings Directly**
+```bash
+# Open Accessibility settings
+cargo run -- --open-accessibility
+
+# Open Input Monitoring settings
+cargo run -- --open-input-monitoring
+```
+*These commands directly open the relevant System Settings pane.*
+
+### **Test Keyboard Capture**
+```bash
+cargo run -- --test-capture
+```
+*Tests if VaixKey can actually capture keyboard events with current permissions.*
 
 ## ⚠️ **Security Notes**
 
