@@ -46,15 +46,9 @@ impl InputMethodEngine {
         // Process the keypress
         let result = self.unikey_engine.process(key_char);
 
-        // Update current buffer based on result
-        match &result {
-            ProcessResult::PassThrough(c) => {
-                self.current_buffer.push(*c);
-            }
-            ProcessResult::Output(_) | ProcessResult::Replace { .. } => {
-                self.current_buffer = self.unikey_engine.get_buffer();
-            }
-        }
+        // Always sync current_buffer with engine's buffer after processing
+        // This ensures separators (which clear the engine buffer) are reflected
+        self.current_buffer = self.unikey_engine.get_buffer();
 
         result
     }

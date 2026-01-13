@@ -222,7 +222,7 @@ async fn run_test_mode(
         println!("   {} → {} ({})", input, result, description);
     }
 
-    println!("\n� Complete Word Processing:");
+    println!("\n🔤 Complete Word Processing:");
     let word_tests = vec![
         ("mootj", "một"),
         ("Vieetj", "Việt"),
@@ -240,6 +240,24 @@ async fn run_test_mode(
         let result = engine.get_current_buffer().to_string();
         let status = if result == *expected { "✅" } else { "❌" };
         println!("   {} {} → {} (expected: {})", status, input, result, expected);
+    }
+
+    // Test separator handling - "nam s" should NOT become "naám s"
+    println!("\n🔀 Separator Handling Tests:");
+    let separator_tests = vec![
+        ("nam s", "s"),  // After space, 's' should be just 's', buffer cleared
+        ("thi9s", "s"),  // After digit, buffer should be cleared
+        ("abc.def", "dè"),  // After period, buffer cleared; then def -> dè (f is telex tone)
+    ];
+
+    for (input, expected_buffer) in &separator_tests {
+        engine.reset_buffer();
+        for ch in input.chars() {
+            engine.process_keypress(ch).await;
+        }
+        let result = engine.get_current_buffer().to_string();
+        let status = if result == *expected_buffer { "✅" } else { "❌" };
+        println!("   {} '{}' → buffer: '{}' (expected: '{}')", status, input, result, expected_buffer);
     }
 
     println!("\n�🔄 Mode Toggle Test:");

@@ -51,6 +51,26 @@ fn grab_callback(event: Event) -> Option<Event> {
 
     match event.event_type {
         EventType::KeyPress(key) => {
+            // Always pass through modifier keys (Ctrl, Alt, Cmd, Shift)
+            if is_modifier_key(&key) {
+                return Some(event);
+            }
+            
+            // Check if this is a separator key that should clear the buffer
+            if is_separator_key(&key) {
+                // Notify the engine to clear its buffer, but let the key through
+                if let Some((tx_mutex, rx_mutex)) = KEY_CHANNEL.get() {
+                    if let Ok(tx) = tx_mutex.lock() {
+                        let _ = tx.send((key, true));
+                    }
+                    // Wait for response but always pass through
+                    if let Ok(rx) = rx_mutex.lock() {
+                        let _ = rx.recv_timeout(Duration::from_millis(50));
+                    }
+                }
+                return Some(event);
+            }
+            
             // Check if this is a character key we should process
             if let Some(_ch) = key_to_char(&key) {
                 // Send to processor and wait for response
@@ -92,6 +112,29 @@ fn grab_callback(event: Event) -> Option<Event> {
         }
         _ => Some(event),
     }
+}
+
+/// Check if this key is a modifier key that should always pass through
+fn is_modifier_key(key: &Key) -> bool {
+    matches!(key, 
+        Key::ShiftLeft | Key::ShiftRight |
+        Key::ControlLeft | Key::ControlRight |
+        Key::Alt | Key::AltGr |
+        Key::MetaLeft | Key::MetaRight |  // Command key on macOS
+        Key::CapsLock | Key::NumLock | Key::ScrollLock |
+        Key::Function  // Fn key
+    )
+}
+
+/// Check if this key is a separator that should clear the buffer
+fn is_separator_key(key: &Key) -> bool {
+    matches!(key, 
+        Key::Space | Key::Return | Key::Tab | 
+        Key::Escape | Key::Backspace |
+        Key::UpArrow | Key::DownArrow | Key::LeftArrow | Key::RightArrow |
+        Key::Home | Key::End | Key::PageUp | Key::PageDown |
+        Key::Delete | Key::Insert
+    )
 }
 
 impl KeyboardMonitor {
@@ -154,7 +197,18 @@ impl KeyboardMonitor {
             // Check for key events with a timeout
             match key_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                 Ok((key, _is_press)) => {
-                    if let Some(ch) = key_to_char(&key) {
+                    // Check if it's a separator key
+                    if is_separator_key(&key) {
+                        // Clear the engine buffer
+                        let mut eng = engine.lock().await;
+                        if debug_mode {
+                            println!("📤 Separator key, clearing buffer: '{}'", eng.get_current_buffer());
+                            println!("─────────────────────────────────────");
+                        }
+                        eng.reset_buffer();
+                        drop(eng);
+                        let _ = action_tx.send(GrabAction::PassThrough);
+                    } else if let Some(ch) = key_to_char(&key) {
                         let action = self.process_key(ch, debug_mode, &engine).await;
                         let _ = action_tx.send(action);
                     } else {
@@ -176,7 +230,7 @@ impl KeyboardMonitor {
 
     async fn process_key(&self, ch: char, debug_mode: bool, engine: &Arc<Mutex<InputMethodEngine>>) -> GrabAction {
         let mut eng = engine.lock().await;
-        let vietnamese_mode = eng.is_vietnamese_mode();
+        let _vietnamese_mode = eng.is_vietnamese_mode();
         let buffer_before = eng.get_current_buffer().to_string();
         
         if debug_mode {
