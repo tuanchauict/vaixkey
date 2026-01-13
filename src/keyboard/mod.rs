@@ -56,21 +56,35 @@ fn grab_callback(event: Event) -> Option<Event> {
 
     match event.event_type {
         EventType::KeyPress(key) => {
+            let debug = DEBUG_MODE.load(Ordering::SeqCst);
+            
             // Track modifier state
             match key {
                 Key::ControlLeft | Key::ControlRight => {
                     CTRL_HELD.store(true, Ordering::SeqCst);
+                    if debug { eprintln!("🔑 CTRL pressed, state=true"); }
                     return Some(event);
                 }
                 Key::Alt | Key::AltGr => {
                     ALT_HELD.store(true, Ordering::SeqCst);
+                    if debug { eprintln!("🔑 ALT pressed, state=true"); }
                     return Some(event);
                 }
                 Key::MetaLeft | Key::MetaRight => {
                     META_HELD.store(true, Ordering::SeqCst);
+                    if debug { eprintln!("🔑 META pressed, state=true"); }
                     return Some(event);
                 }
                 _ => {}
+            }
+            
+            // Check modifier state
+            let ctrl = CTRL_HELD.load(Ordering::SeqCst);
+            let alt = ALT_HELD.load(Ordering::SeqCst);
+            let meta = META_HELD.load(Ordering::SeqCst);
+            
+            if debug {
+                eprintln!("🔑 Key {:?} - modifiers: ctrl={}, alt={}, meta={}", key, ctrl, alt, meta);
             }
             
             // Always pass through modifier keys (Shift, CapsLock, etc.)
