@@ -725,7 +725,29 @@ impl UnikeyEngine {
                 let v1_family = v1_attr.vowel_index;
                 let v2_family = v2_attr.vowel_index;
                 
-                if self.modern_style {
+                // Check for Q or GI prefix - tone goes on last vowel
+                let has_q_prefix = start_pos > 0 && {
+                    let prev_char = self.buf[(start_pos - 1) as usize].to_uppercase().next().unwrap_or(' ');
+                    prev_char == 'Q'
+                };
+                let has_gi_prefix = start_pos > 0 && {
+                    let prev_char = self.buf[(start_pos - 1) as usize].to_uppercase().next().unwrap_or(' ');
+                    prev_char == 'G' && (start_pos as usize) < self.keys && {
+                        let next_char = self.buf[start_pos as usize].to_uppercase().next().unwrap_or(' ');
+                        next_char == 'I'
+                    }
+                };
+                
+                // Check if there's a consonant after the vowel sequence
+                let has_consonant_after = (end_pos as usize) < self.keys - 1;
+                
+                if has_q_prefix || has_gi_prefix {
+                    // After Q or GI, tone goes on last vowel
+                    end_pos as usize
+                } else if has_consonant_after {
+                    // If consonant follows (like "tuấn"), tone goes on last vowel
+                    end_pos as usize
+                } else if self.modern_style {
                     // Special cases where tone goes on second vowel:
                     // oa, oe, uy -> second vowel
                     // iê, ươ, uô -> second vowel (the main vowel in these diphthongs)

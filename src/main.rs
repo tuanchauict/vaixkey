@@ -250,6 +250,13 @@ async fn run_test_mode(
         ("hocj", "học"),
         ("tooij", "tội"),
         ("xooong", "xoong"),  // Need 3 o's to get "oo" (undo circumflex)
+        ("thuee", "thuê"),    // u + ee = uê
+        ("nguwowif", "người"), // ng + ư + ơ + i + f = người
+        ("dduwowngf", "đường"),// đ + ư + ơ + ng + f = đường
+        ("khoong", "không"),  // khô + ng (no undo, just oo → ô)
+        ("tuaans", "tuấn"),   // t + u + â + n + s = tuấn (aa for â)
+        ("quas", "quá"),      // qu + a + s = quá (Q prefix exception)
+        ("gias", "giá"),      // gi + a + s = giá (GI prefix exception)
     ];
 
     for (input, expected) in &word_tests {
