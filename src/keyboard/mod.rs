@@ -11,6 +11,11 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 static INJECTING: AtomicBool = AtomicBool::new(false);
 
+/// Track modifier key state to pass through Ctrl+X, Alt+X, Cmd+X combinations
+static CTRL_HELD: AtomicBool = AtomicBool::new(false);
+static ALT_HELD: AtomicBool = AtomicBool::new(false);
+static META_HELD: AtomicBool = AtomicBool::new(false);  // Command key on macOS
+
 /// Struct to hold processing result from engine
 #[derive(Clone, Debug)]
 enum GrabAction {
@@ -51,8 +56,33 @@ fn grab_callback(event: Event) -> Option<Event> {
 
     match event.event_type {
         EventType::KeyPress(key) => {
-            // Always pass through modifier keys (Ctrl, Alt, Cmd, Shift)
+            // Track modifier state
+            match key {
+                Key::ControlLeft | Key::ControlRight => {
+                    CTRL_HELD.store(true, Ordering::SeqCst);
+                    return Some(event);
+                }
+                Key::Alt | Key::AltGr => {
+                    ALT_HELD.store(true, Ordering::SeqCst);
+                    return Some(event);
+                }
+                Key::MetaLeft | Key::MetaRight => {
+                    META_HELD.store(true, Ordering::SeqCst);
+                    return Some(event);
+                }
+                _ => {}
+            }
+            
+            // Always pass through modifier keys (Shift, CapsLock, etc.)
             if is_modifier_key(&key) {
+                return Some(event);
+            }
+            
+            // If any modifier (Ctrl/Alt/Cmd) is held, pass through the key
+            // This allows Ctrl+C, Cmd+V, Alt+Tab, etc. to work
+            if CTRL_HELD.load(Ordering::SeqCst) || 
+               ALT_HELD.load(Ordering::SeqCst) || 
+               META_HELD.load(Ordering::SeqCst) {
                 return Some(event);
             }
             
@@ -106,7 +136,20 @@ fn grab_callback(event: Event) -> Option<Event> {
             }
             Some(event)
         }
-        EventType::KeyRelease(_key) => {
+        EventType::KeyRelease(key) => {
+            // Track modifier release
+            match key {
+                Key::ControlLeft | Key::ControlRight => {
+                    CTRL_HELD.store(false, Ordering::SeqCst);
+                }
+                Key::Alt | Key::AltGr => {
+                    ALT_HELD.store(false, Ordering::SeqCst);
+                }
+                Key::MetaLeft | Key::MetaRight => {
+                    META_HELD.store(false, Ordering::SeqCst);
+                }
+                _ => {}
+            }
             // Let key releases through
             Some(event)
         }
