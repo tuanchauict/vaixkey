@@ -10,7 +10,9 @@
       "Bash(cargo check:*)",
       "Bash(git commit:*)",
       "Bash(timeout:*)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(open:*)",
+      "Bash(osascript:*)"
     ],
     "deny": [],
     "ask": []
