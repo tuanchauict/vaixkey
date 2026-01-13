@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 # Core event handling and keyboard monitoring
-rdev = "0.4"
+rdev = { version = "0.5", features = ["unstable_grab"] }
 # macOS-specific APIs through Objective-C bindings
 objc = "0.2"
 cocoa = "0.25"

@@ -7,7 +7,7 @@ pub mod vni;
 pub mod vietnamese_engine;
 pub mod unikey_engine;
 
-use unikey_engine::{UnikeyEngine, ProcessResult, InputMethod};
+pub use unikey_engine::{UnikeyEngine, ProcessResult, InputMethod};
 
 #[derive(Debug)]
 pub struct InputMethodEngine {
@@ -28,7 +28,7 @@ impl InputMethodEngine {
         }
     }
 
-    pub async fn process_keypress(&mut self, key_char: char) -> Option<String> {
+    pub async fn process_keypress(&mut self, key_char: char) -> ProcessResult {
         // Update the engine's Vietnamese mode
         if self.unikey_engine.is_vietnamese_mode() != self.is_vietnamese_mode {
             self.unikey_engine.set_vietnamese_mode(self.is_vietnamese_mode);
@@ -46,20 +46,17 @@ impl InputMethodEngine {
         // Process the keypress
         let result = self.unikey_engine.process(key_char);
 
-        match result {
+        // Update current buffer based on result
+        match &result {
             ProcessResult::PassThrough(c) => {
-                self.current_buffer.push(c);
-                Some(self.unikey_engine.get_buffer())
+                self.current_buffer.push(*c);
             }
-            ProcessResult::Output(text) => {
+            ProcessResult::Output(_) | ProcessResult::Replace { .. } => {
                 self.current_buffer = self.unikey_engine.get_buffer();
-                Some(text)
-            }
-            ProcessResult::Replace { backspaces: _, text } => {
-                self.current_buffer = self.unikey_engine.get_buffer();
-                Some(text)
             }
         }
+
+        result
     }
 
     pub fn toggle_vietnamese_mode(&mut self) {

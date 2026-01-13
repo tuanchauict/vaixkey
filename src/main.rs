@@ -196,12 +196,10 @@ async fn run_test_mode(
         engine.reset_buffer();
 
         // Process each character
-        let mut result = String::new();
         for ch in input.chars() {
-            if let Some(output) = engine.process_keypress(ch).await {
-                result = output;
-            }
+            engine.process_keypress(ch).await;
         }
+        let result = engine.get_current_buffer().to_string();
 
         println!("   {} → {} ({})", input, result, description);
     }
@@ -217,16 +215,34 @@ async fn run_test_mode(
 
     for (input, description) in &tone_tests {
         engine.reset_buffer();
-        let mut result = String::new();
         for ch in input.chars() {
-            if let Some(output) = engine.process_keypress(ch).await {
-                result = output;
-            }
+            engine.process_keypress(ch).await;
         }
+        let result = engine.get_current_buffer().to_string();
         println!("   {} → {} ({})", input, result, description);
     }
 
-    println!("\n🔄 Mode Toggle Test:");
+    println!("\n� Complete Word Processing:");
+    let word_tests = vec![
+        ("mootj", "một"),
+        ("Vieetj", "Việt"),
+        ("naawng", "năng"),
+        ("ddaays", "đấy"),
+        ("hocj", "học"),
+        ("tooij", "tội"),
+    ];
+
+    for (input, expected) in &word_tests {
+        engine.reset_buffer();
+        for ch in input.chars() {
+            engine.process_keypress(ch).await;
+        }
+        let result = engine.get_current_buffer().to_string();
+        let status = if result == *expected { "✅" } else { "❌" };
+        println!("   {} {} → {} (expected: {})", status, input, result, expected);
+    }
+
+    println!("\n�🔄 Mode Toggle Test:");
     println!("   Current mode: {}", if engine.is_vietnamese_mode() { "Vietnamese" } else { "English" });
     engine.toggle_vietnamese_mode();
     println!("   After toggle: {}", if engine.is_vietnamese_mode() { "Vietnamese" } else { "English" });

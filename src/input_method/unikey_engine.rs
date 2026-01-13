@@ -474,22 +474,58 @@ impl UnikeyEngine {
             
             // Check if this is a vowel that can receive the breve/horn
             if attr.vowel_index > 0 {
-                let base_vowel = self.get_base_vowel(buf_char);
-                let target_char = match base_vowel.to_lowercase().next().unwrap_or(base_vowel) {
-                    'a' => if is_lower { 'ă' } else { 'Ă' },
-                    'o' => if is_lower { 'ơ' } else { 'Ơ' },
-                    'u' => if is_lower { 'ư' } else { 'Ư' },
-                    _ => {
-                        i -= 1;
-                        continue;
+                // Determine which vowel family this belongs to and what transformation to apply
+                // vowel_index: a=1, â=2, ă=3, e=4, ê=5, i=6, o=7, ô=8, ơ=9, u=10, ư=11, y=12
+                let (target_char, can_apply) = match attr.vowel_index {
+                    1 | 2 | 3 => {
+                        // a, â, ă families -> apply breve to get ă
+                        let target = if buf_char.is_uppercase() { 'Ă' } else { 'ă' };
+                        (target, true)
                     }
+                    7 | 8 | 9 => {
+                        // o, ô, ơ families -> apply horn to get ơ
+                        let target = if buf_char.is_uppercase() { 'Ơ' } else { 'ơ' };
+                        (target, true)
+                    }
+                    10 | 11 => {
+                        // u, ư families -> apply horn to get ư
+                        let target = if buf_char.is_uppercase() { 'Ư' } else { 'ư' };
+                        (target, true)
+                    }
+                    _ => ('\0', false)
                 };
 
-                // Check for duplicate (undo)
-                if self.buf[i as usize] == target_char {
-                    // Revert to original
+                if !can_apply {
+                    i -= 1;
+                    continue;
+                }
+
+                // Get the base character of the target family to check for undo
+                let target_base = match target_char.to_lowercase().next().unwrap_or(target_char) {
+                    'ă' => if buf_char.is_uppercase() { 'Ă' } else { 'ă' },
+                    'ơ' => if buf_char.is_uppercase() { 'Ơ' } else { 'ơ' },
+                    'ư' => if buf_char.is_uppercase() { 'Ư' } else { 'ư' },
+                    _ => target_char,
+                };
+
+                // Check if the current char is already the target (undo)
+                let current_base = self.get_base_vowel(buf_char);
+                if current_base.to_lowercase().next() == target_base.to_lowercase().next() {
+                    // Already breve/horn, undo by reverting to plain vowel
+                    let plain_vowel = match attr.vowel_index {
+                        1 | 2 | 3 => if buf_char.is_uppercase() { 'A' } else { 'a' },
+                        7 | 8 | 9 => if buf_char.is_uppercase() { 'O' } else { 'o' },
+                        10 | 11 => if buf_char.is_uppercase() { 'U' } else { 'u' },
+                        _ => buf_char,
+                    };
+                    // Apply current tone to plain vowel
+                    let new_char = if attr.current_tone > 0 {
+                        self.apply_tone_to_base(plain_vowel, attr.current_tone)
+                    } else {
+                        plain_vowel
+                    };
                     self.backs = (self.keys - i as usize) as usize;
-                    self.buf[i as usize] = base_vowel;
+                    self.buf[i as usize] = new_char;
                     self.rebuild_output(i as usize);
                     self.output_buffer.push(c);
                     self.put_char(c, is_lower);
@@ -497,10 +533,9 @@ impl UnikeyEngine {
                     return;
                 }
 
-                // Apply the transformation
-                let current_tone = attr.current_tone;
-                let new_char = if current_tone > 0 {
-                    self.apply_tone_to_base(target_char, current_tone)
+                // Apply the transformation, preserving any existing tone
+                let new_char = if attr.current_tone > 0 {
+                    self.apply_tone_to_base(target_char, attr.current_tone)
                 } else {
                     target_char
                 };
@@ -637,45 +672,58 @@ impl UnikeyEngine {
             if attr.vowel_index == 0 {
                 break;
             }
-            // Stop if we hit a toned vowel (to replace the tone)
-            let base_char = self.buf[i as usize];
-            if base_char.is_alphabetic() && !base_char.is_ascii_alphabetic() {
-                break;
-            }
             i -= 1;
         }
+        // i now points to one position before the first vowel, adjust to first vowel
+        let start_pos = i + 1;
 
         // Determine which vowel to apply the tone to
-        let vowel_seq_len = (end_pos - i) as usize;
+        // vowel_seq_len is the number of consecutive vowels
+        let vowel_seq_len = (end_pos - start_pos + 1) as usize;
         let target_pos = match vowel_seq_len {
             2 => {
-                // Check for special cases: oa, oe, uy -> tone on second vowel
+                // Two vowels: need to determine which one gets the tone
+                let v1 = self.buf[start_pos as usize];
+                let v2 = self.buf[end_pos as usize];
+                let v1_attr = self.dt.get(&v1).copied().unwrap_or_default();
+                let v2_attr = self.dt.get(&v2).copied().unwrap_or_default();
+                
+                // Get vowel family indices
+                // a=1, â=2, ă=3, e=4, ê=5, i=6, o=7, ô=8, ơ=9, u=10, ư=11, y=12
+                let v1_family = v1_attr.vowel_index;
+                let v2_family = v2_attr.vowel_index;
+                
                 if self.modern_style {
-                    let v1 = self.buf[(end_pos - 1) as usize].to_lowercase().next().unwrap_or(' ');
-                    let v2 = self.buf[end_pos as usize].to_lowercase().next().unwrap_or(' ');
-                    if (v1 == 'o' && v2 == 'a') || (v1 == 'o' && v2 == 'e') || (v1 == 'u' && v2 == 'y') {
+                    // Special cases where tone goes on second vowel:
+                    // oa, oe, uy -> second vowel
+                    // iê, ươ, uô -> second vowel (the main vowel in these diphthongs)
+                    let tone_on_second = 
+                        // o + a/e patterns
+                        ((v1_family == 7 || v1_family == 8 || v1_family == 9) && 
+                         (v2_family == 1 || v2_family == 2 || v2_family == 3 || v2_family == 4)) ||
+                        // u + y pattern
+                        ((v1_family == 10 || v1_family == 11) && v2_family == 12) ||
+                        // i + ê pattern (iê, yê)
+                        ((v1_family == 6 || v1_family == 12) && v2_family == 5) ||
+                        // ư + ơ pattern
+                        (v1_family == 11 && v2_family == 9) ||
+                        // u + ô pattern  
+                        (v1_family == 10 && v2_family == 8);
+                    
+                    if tone_on_second {
                         end_pos as usize
                     } else {
-                        // Check for qu, gi patterns
-                        if i >= 0 {
-                            let prev = self.buf[i as usize].to_uppercase().next().unwrap_or(' ');
-                            if prev == 'Q' || (prev == 'G' && i + 1 < self.keys as i32 && 
-                                self.buf[(i + 1) as usize].to_uppercase().next().unwrap_or(' ') == 'I') {
-                                end_pos as usize
-                            } else if self.keys as i32 > end_pos + 1 {
-                                end_pos as usize
-                            } else {
-                                (end_pos - 1) as usize
-                            }
-                        } else {
-                            (end_pos - 1) as usize
-                        }
+                        // Most diphthongs: tone on first vowel (ôi, ai, ao, etc.)
+                        start_pos as usize
                     }
                 } else {
-                    (end_pos - 1) as usize
+                    start_pos as usize
                 }
             }
-            3 => (end_pos - 1) as usize,
+            3 => {
+                // Three vowels: tone goes on middle vowel
+                (start_pos + 1) as usize
+            }
             _ => end_pos as usize,
         };
 
